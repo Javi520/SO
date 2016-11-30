@@ -1,20 +1,28 @@
-//iwnbb
+(*iwnbb*)
+
+(*compile me with ocamlc "unix.cma" whatevernameihave.ml -o whatevernameyouwantsirofme*)
+
+include Unix;;
+include Buffer;;
 
 (*ADN(size,key,adress,name,time)*)
 module Ipc_fifo_oimp = struct
 
-	type alloc_data_node = float*float*float*string*string;;(*should be float of the problem of int being 32 bits in C but 31 in Caml*)
+	type alloc_data_node = float*float*float*string*string;;(*should be float of the problem of int being 32 bits in C but 31 in Caml*V.2 moreover the address that can be a unsigned long*)
 
 	type anom_struct =
 			ADN of alloc_data_node
-		| Empty;;(*for making easier to detect non-found elements*)
+		| Empty(*for making easier to detect non-found elements*)
+	;;
 
 	let print_str_uct (elemento:anom_struct) f where_to_print = match elemento with
 			ADN(a,b,c,d,e) -> let aux = String.concat "" [(string_of_float a);" "; (string_of_float b);" "; (string_of_float c);" "; d;" "; e]
-			in write where_to_print (aux) 0 (String.length aux);;
+			in write where_to_print (aux) 0 (String.length aux)
+	;;
 	
 	type tridente =
-			Trid of anom_struct list ref * anom_struct list ref * anom_struct list ref;;
+			Trid of anom_struct list ref * anom_struct list ref * anom_struct list ref
+	;;
 
 	(* #PRIMER_INTENTO
 	let read_str_uct where_to_get_from = 
@@ -171,51 +179,29 @@ end
 
 include Ipc_fifo_oimp;;(*need for being not a shit to work with*)
 
-let prueba = Trid(ref [ADN(1.,1.,1.,"","")],ref[],ref[]);;
-mostrar_lista stdin (0,prueba);;(*stdout is more logical to use*)
-
 let rec main (lista:tridente) = function
 	 fifo_out,fifo_in -> match read_str_uct fifo_in with
-	 		a,Some 0.1 -> insertar (ADN(a)) (1,lista) ; main lista (fifo_out,fifo_in) 
-		  | a,Some 0.2 -> insertar (ADN(a)) (2,lista) ; main lista (fifo_out,fifo_in) 
-		  | a,Some 0.3 -> insertar (ADN(a)) (3,lista) ; main lista (fifo_out,fifo_in) 
+	 		a,Some 0.1 -> insertar (ADN(a)) (1-1,lista) ; main lista (fifo_out,fifo_in) 
+		  | a,Some 0.2 -> insertar (ADN(a)) (2-1,lista) ; main lista (fifo_out,fifo_in) 
+		  | a,Some 0.3 -> insertar (ADN(a)) (3-1,lista) ; main lista (fifo_out,fifo_in) 
 		  | a,Some 1.11 -> print_str_uct (buscarydestruir ((function Trid(lia,_,_) -> lia) lista) (function ADN(_,b,_,_,_) -> b) (Some ((function (_,b,_,_,_) -> b) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
 		  | a,Some 1.12 -> print_str_uct (buscarydestruir ((function Trid(_,lib,_) -> lib) lista) (function ADN(_,b,_,_,_) -> b) (Some ((function (_,b,_,_,_) -> b) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
 		  | a,Some 1.13 -> print_str_uct (buscarydestruir ((function Trid(_,_,lic) -> lic) lista) (function ADN(_,b,_,_,_) -> b) (Some ((function (_,b,_,_,_) -> b) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
 		  | a,Some 1.21 -> print_str_uct (buscarydestruir ((function Trid(lia,_,_) -> lia) lista) (function ADN(a,_,_,_,_) -> a) (Some ((function (a,_,_,_,_) -> a) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
 		  | a,Some 1.22 -> print_str_uct (buscarydestruir ((function Trid(_,lib,_) -> lib) lista) (function ADN(a,_,_,_,_) -> a) (Some ((function (a,_,_,_,_) -> a) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
 		  | a,Some 1.23 -> print_str_uct (buscarydestruir ((function Trid(_,_,lic) -> lic) lista) (function ADN(a,_,_,_,_) -> a) (Some ((function (a,_,_,_,_) -> a) a))) (write) fifo_out ; main lista (fifo_out,fifo_in)
-		  | a,Some 2.1 -> mostrar_lista fifo_out (1,lista) ; main lista (fifo_out,fifo_in)
-		  | a,Some 2.2 -> mostrar_lista fifo_out (2,lista) ; main lista (fifo_out,fifo_in)
-		  | a,Some 2.3 -> mostrar_lista fifo_out (3,lista) ; main lista (fifo_out,fifo_in)
+		  | a,Some 2.1 -> mostrar_lista fifo_out (1-1,lista) ; main lista (fifo_out,fifo_in)
+		  | a,Some 2.2 -> mostrar_lista fifo_out (2-1,lista) ; main lista (fifo_out,fifo_in)
+		  | a,Some 2.3 -> mostrar_lista fifo_out (3-1,lista) ; main lista (fifo_out,fifo_in)
 		  | a,Some 2.5 -> mostrar_lista fifo_out (5,lista) ; main lista (fifo_out,fifo_in)
 		  | _,Some 3. -> raise (Failure "no tengo mas chollo");;
-	
-(*
-(*C program -> mkfifo(".../fifo_lectura",0777)*)
-let fifo_in = openfile "fifo_lectura" [O_RDONLY] 777;;
-(*para que no se hagan un bloqueo mutuo,
-__MMMMMMMMMMMMM__debe ser en este orden
-__[[.]]___[[.]]__sino al abrir para leer uno,
-_________________y no abrirse para escribir se
-__(____| |____)__bloquea el primero, por no tener
-________!________quien lo escriba*)
-let fifo_out = mkfifo "fifo_escritura" 777;;(*C program -> open(".../fifo_lectura",O_WRONLY)*)
-ocaml_list_serving_machine fifo_in, fifo_out;;
-let pipe_in,pipe_out = Unix.pipe ();;
-#use "topfind";;
-#thread;;
-ignore (Thread.create (read pipe_in "hola" 0 4); ());;
-*)
 
-(*fifo_xxxx_YYYYY means that first process, the not fork_exec one, is YYYYY role*)
-let oth_fifo_out = openfile "fifo_lectura_ESCRITURA" [O_WRONLY] 777;;(*los uso para representar un poco lo que hara el otro programa "oth" aunque no me valdran para nada*)
-let oth_fifo_in = openfile "fifo_escritura_LECTURA" [O_RDONLY] 777;;(*los uso para representar un poco lo que hara el otro programa "oth" aunque no me valdran para nada*)
-let fifo_out = openfile "fifo_escritura_LECTURA" [O_WRONLY] 777;;
+
+let fifo_out = openfile "fifo_LECTURA_escritura" [O_WRONLY] 777;;
 let fifo_in = openfile "fifo_lectura_ESCRITURA" [O_RDONLY] 777;;
 
-main Trid(ref[],ref[],ref[]) (stdout,stderr);;(*esto lo hace todo*)
-main Trid(ref[],ref[],ref[]) (fifo_out,fifo_in);;(*esto lo hace todo*)
+
+main (Trid(ref[],ref[],ref[])) (fifo_out,fifo_in);;(*esto lo hace todo*)
 
 (*estamos en windows, (suspiro) puto windows, no vale llamar a openfile supongo*)
 (*
