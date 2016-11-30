@@ -27,17 +27,20 @@ typedef struct {
 	size_t a_size;
 	time_t timex;
 	int shared_key;
-	void * address;
+	unsigned long address;
 	char file_name[256];//256 como maximo
 }c_struct;
 
 int vfork_exec(const char * file){
 	char * aux[2];
-	aux[0]=file;
+	aux[0]=(char *)file;
 	aux[1]=NULL;
 	int status, pid;
 	if(pid=(vfork())==0){//esta llamada es de uso responsable, i.e, no debemos realizar nada mas que usar el valor devuelto por el vfork como se hace en *()==0... y llamar a exec o a exit
 		execvp(file, aux);//ejecuta un proceso con el programa que le pasamos
+		perror("Hijo: lo siento padre te he fallado");
+		perror("Padre:...(se ha hecho un vfork)");
+		perror("Hijo: padre, lo siento, me hago el sepukku");	
 		exit(127);
 	}
 	//el padre no vuelve en si hasta que se hace un exit o un exec, ahora hago un waitpid para saber si salio el hijo o no
@@ -47,12 +50,20 @@ int vfork_exec(const char * file){
 }
 
 int crearLista(){
-	if(!mkfifo(fifo_out, (mode_t) 0666)||!(mkfifo(fifo_in, (mode_t) 0666)))/*sino funciona cualquiera no vale para nada, bueno el out podria ser el stdout en Caml pero la entrada no*/
-		printf("hay que borrar los pipes despues de usarlos");
-	if(vfork_exec("./list_server")==-1)
+	int aux1, aux2;
+	aux1 = mkfifo(fifo_out, (mode_t) 0666);
+	aux2 = mkfifo(fifo_in, (mode_t) 0666);
+	if(aux1||aux2)/*sino funciona cualquiera no vale para nada, bueno el out podria ser el stdout en Caml pero la entrada no*/
+		perror("error al crear pipes, si uso pipes");
+	if(vfork_exec("./list_server")==1)
 		return 0;//si lo metes en una funcion te olvidas de preocuparte por no modificar nada despues de vfork()
 	if(!(fd_out=open(fifo_out, O_WRONLY, (mode_t) 0666))||!(fd_in=open(fifo_in, O_RDONLY, (mode_t) 0666)))
+	{
+		perror("no deberia pasar ahora mismo no");
 		return 0;//zero es el nuevo -1
+	}
+	printf("fifo_out: %d , fifo_in: %d\n", fifo_out, fifo_in);
+	printf("acabe de abrir los pipes\n");
 	return 1;
 }
 
@@ -103,8 +114,9 @@ char * c_struct_to_str(char * option, c_struct * to_be_converted){
 	i = 2;
 #endif
 
+	strcat(str," ");
 	if(i)
-		printf("freeing after concat of str_aux which stores size converted to char *");
+		printf("freeing after concat of str_aux which stores size converted to char *\n");
 	//freeing after concat of str_aux which stores size converted to char *
 	str_aux = strofint((unsigned long)to_be_converted->a_size, 0);
 	strcat(str,str_aux);
@@ -112,7 +124,7 @@ char * c_struct_to_str(char * option, c_struct * to_be_converted){
 	
 	strcat(str," ");
 	if(i)
-		printf("freeing after concat of str_aux which stores timex converted to char *");
+		printf("freeing after concat of str_aux which stores timex converted to char *\n");
 	//freeing after concat of str_aux which stores timex converted to char *
 	str_aux = strofint((unsigned long)to_be_converted->timex, 0);
 	strcat(str,str_aux);
@@ -120,7 +132,7 @@ char * c_struct_to_str(char * option, c_struct * to_be_converted){
 	
 	strcat(str," ");
 	if(i)
-		printf("freeing after concat of str_aux which stores shared_key converted to char *");
+		printf("freeing after concat of str_aux which stores shared_key converted to char *\n");
 	//freeing after concat of str_aux which stores shared_key converted to char *
 	str_aux = strofint((unsigned long)to_be_converted->shared_key, 0);
 	strcat(str,str_aux);
@@ -128,15 +140,15 @@ char * c_struct_to_str(char * option, c_struct * to_be_converted){
 	
 	strcat(str," ");
 	if(i)
-		printf("freeing after concat of str_aux which stores address converted to char *");
+		printf("freeing after concat of str_aux which stores address converted to char *\n");
 	//freeing after concat of str_aux which stores address converted to char *
-	str_aux = strofint((unsigned long)to_be_converted->address, 1);//quiero que se le aplique el hex V.2 la respuesta es aunque a nadie le importe no V.3 por eso he cambiado el codigo
+	str_aux = strofint(to_be_converted->address, 0);//quiero que se le aplique el hex V.2 la respuesta es aunque a nadie le importe no V.3 por eso he cambiado el codigo
 	strcat(str,str_aux);
 	free(str_aux);
 
 	strcat(str," ");
 	if(i)
-		printf("concat of name");
+		printf("concat of name\n");
 	//concat of name
 	strcat(str,to_be_converted->file_name);//no compila por el tamaño fijo
 	strncat(str,to_be_converted->file_name,256);//to test
@@ -146,33 +158,38 @@ RETURN:
 
 int sendLista(char * buf){
 	if(buf==NULL){
-		perror("error grave");//no hay memoria disponible para una misera variable como buf
+		perror("error grave");//no hay memoria disponible para una misera variable como buf o es un gracioso el que le paso un NULL jajajajaja no le veo la gracia a mi no me jodiste machote
 		exit(127);
 	}
+	printf("envio a list_server %s\n", buf);
 	return write(fd_out, buf, strlen(buf));
 }
 
-int insertarLista(int * whom, c_struct * to_be_inserted){
+int insertarLista(int whom, c_struct * to_be_inserted){
 	char * buf = NULL;
-	switch(*whom){
+	switch(whom){
 		case 0 : 
 			buf = c_struct_to_str("-i1", to_be_inserted);
+			//what we send?
+			printf("%s1hola\n", buf);
 			return sendLista(buf);
 		case 1 : 
-			buf = c_struct_to_str("-i2", to_be_inserted);
+			buf = c_struct_to_str("-i2", to_be_inserted);;
+			//what we send?
+			printf("%s2hola\n", buf);;
 			return sendLista(buf);
 		case 2 : 
 			buf = c_struct_to_str("-i3", to_be_inserted);
+			//what we send?
+			printf("%s3hola\n", buf);
 			return sendLista(buf);
-		case 3 | 5 : 
-			buf = c_struct_to_str("-i5", to_be_inserted);
-			return sendLista(buf);
+		default : return 0;
 	}
 }
 
-int borrarElementoLista(int * whom, c_struct * to_be_removed, int for_size){
+int borrarElementoLista(int whom, c_struct * to_be_removed, int for_size){
 	char * buf = NULL;
-	switch(*whom+for_size){
+	switch(whom+for_size){
 		case 0+FOR_SIZE : 
 			buf = c_struct_to_str("-s1", to_be_removed);
 			return sendLista(buf);
@@ -191,12 +208,13 @@ int borrarElementoLista(int * whom, c_struct * to_be_removed, int for_size){
 		case 2 : 
 			buf = c_struct_to_str("-b3", to_be_removed);
 			return sendLista(buf);
+		default : return 0;
 	}
 }
 
-int mostrarLista(int * whom){
+int mostrarLista(int whom){
 	//char * buf = NULL;
-	switch(*whom){
+	switch(whom){
 		case 0 : 
 			return sendLista((char *)"-m1");
 		case 1 : 
@@ -205,24 +223,36 @@ int mostrarLista(int * whom){
 			return sendLista((char *)"-m3");
 		case 3 | 5 : 
 			return sendLista((char *)"-m5");
+		default : return 0;
 	}
+}
+
+int cerrarLista(){
+	return sendLista((char *) "-c0");
 }
 
 #define INTENTOS_LISTA 20
 
 int main(){
 	int i = INTENTOS_LISTA;
+	/*
 	while(--i || crearLista()==-1);//crearLista i intentos
 	if(i==0)
 		exit(127);
+	*/
+	printf("%d\n",crearLista());
 	i = INTENTOS_LISTA;
 	c_struct aux;
 	aux.a_size=100;
 	aux.timex=1000;
 	aux.shared_key=0;
-	aux.address=(void *) 134010203920;
+	aux.address=134010203920;
 	strcpy(aux.file_name, "");
 	int * p = malloc(sizeof(int));
 	*p=1;
-	insertarLista(p,&aux);
+	perror("marcador");
+	insertarLista(1,&aux);
+	mostrarLista(1);
+#define PUTAMIERDAPORQUETENGOQUEDEVOLVERALGOPARAQUENOHAYAWARNINGS 0
+	return PUTAMIERDAPORQUETENGOQUEDEVOLVERALGOPARAQUENOHAYAWARNINGS;
 }

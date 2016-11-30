@@ -104,7 +104,8 @@ module Ipc_fifo_oimp = struct
 
 	let read_str_uct source = 
 		let rec aux all_in_str choosen_option one_word_buffer word_box word_index = function
-				0 -> begin match String.sub all_in_str 0 3 with 
+				0 -> 
+				begin match String.sub all_in_str 0 3 with 
 					"-m1" -> (0.,0.,0.,"",""),Some 2.1
 				  | "-m2" -> (0.,0.,0.,"",""),Some 2.2
 				  | "-m3" -> (0.,0.,0.,"",""),Some 2.3
@@ -118,7 +119,11 @@ module Ipc_fifo_oimp = struct
 				  | "-s1" -> aux all_in_str (Some 1.21) one_word_buffer word_box 0 4
 				  | "-s2" -> aux all_in_str (Some 1.22) one_word_buffer word_box 0 4
 				  | "-s3" -> aux all_in_str (Some 1.23) one_word_buffer word_box 0 4
-				  | _ -> raise (Failure "Error 001: wrong format")end
+				  | err -> (0.,0.,0.,"",""),None 
+(*
+Sys.command ("rm fifo_lectura_ESCRITURA fifo_LECTURA_escritura")
+*)
+				end
 			  | coi -> 
 					try match String.get all_in_str coi, word_index<>5 with
 						' ',true -> let str_of_buffer = contents one_word_buffer in
@@ -194,14 +199,21 @@ let rec main (lista:tridente) = function
 		  | a,Some 2.2 -> mostrar_lista fifo_out (2-1,lista) ; main lista (fifo_out,fifo_in)
 		  | a,Some 2.3 -> mostrar_lista fifo_out (3-1,lista) ; main lista (fifo_out,fifo_in)
 		  | a,Some 2.5 -> mostrar_lista fifo_out (5,lista) ; main lista (fifo_out,fifo_in)
-		  | _,Some 3. -> raise (Failure "no tengo mas chollo");;
+		  | _,Some 3. -> raise (Failure "no tengo mas chollo")
+		  | _,None -> main lista (fifo_out,fifo_in);;
 
 
-let fifo_out = openfile "fifo_LECTURA_escritura" [O_WRONLY] 777;;
+print_endline "PRUEBA OK";;
 let fifo_in = openfile "fifo_lectura_ESCRITURA" [O_RDONLY] 777;;
+print_endline "fifo_lectura_ESCRITURA OK";;
+let fifo_out = openfile "fifo_LECTURA_escritura" [O_WRONLY] 777;;
+print_endline "fifo_LECTURA_escritura OK";;
+
+
 
 
 main (Trid(ref[],ref[],ref[])) (fifo_out,fifo_in);;(*esto lo hace todo*)
+(*si se quiere probar sin el archivo c pues mi consejo es el ocamltop y llamar a main con lo mismo pero (stdout,stdin)*)
 
 (*estamos en windows, (suspiro) puto windows, no vale llamar a openfile supongo*)
 (*
